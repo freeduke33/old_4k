@@ -1,0 +1,80 @@
+#include <math.h>
+
+#include "tcxlwin.h"
+#include "dac_adc.h"
+#include "pro_achh.h"
+#include <stdlib.h>
+
+
+void m_p_garm(void)
+
+{
+ int  j,k;
+ unsigned long i,cl;
+ float ys[4],ky[4];
+
+ ys[0]=0.038;
+ ys[1]=-0.028;
+ ys[2]=-0.037;
+ ys[3]=0.035;
+ ky[0]=1.01;
+ ky[1]=0.970;
+ ky[2]=1.05;
+ ky[3]=0.960;
+
+ if(!AllocBuf() || !etalon()) return;
+ Inf_Rab();
+
+ if(Enable()==DRV_OK)
+ {
+ for(cl=0;cl<cycle;cl++)
+   for(i=0;i<nr;i++)
+     {
+     for(k=0;k<4;k++) x[k][i]=xk[k]=yt[k][i];
+     Imit_Driv();
+     for(k=0;k<4;k++)
+      {
+      y[k][i]=yt[k][i]*ky[k]+random(100)*0.0004;
+      x[k][i]= x[k][i]+random(100)*0.0001;
+      }
+     }
+ Disable();
+ graf_time();
+ } else printf("\007\007\007");
+
+ Wclose();
+ return;
+}
+
+void p_garm(void)
+{
+ int k;
+ unsigned long i,cl;
+
+ if(!AllocBuf() || !etalon()) return;
+
+ Inf_Rab();
+
+ if(Enable()==DRV_OK)
+ {
+ // Подготовительные операции разомкнутого упр. с моделью
+
+ for(cl=0;cl<cycle;cl++)
+   for(i=0;i<=nr;i++)
+     {
+
+     //  формирование сигнала упр.
+//     for(k=0;k<4;k++) xk[k]=x[k][i];
+     for(k=0;k<4;k++) x[k][i]=xk[k]=yt[k][i];
+     Imit_Driv();
+     for(k=0;k<4;k++) y[k][i]=yk[k];
+
+
+     }
+ Disable();
+ graf_time();
+ } else printf("\007\007\007");
+
+ Wclose();
+ return;
+}

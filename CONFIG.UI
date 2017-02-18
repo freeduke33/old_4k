@@ -1,0 +1,42 @@
+
+; UI v2 configuration file CONFIG.UI
+
+info = ON
+
+; display colors
+hilite = N/BG
+lolite = +BG/B
+
+; editor dimensions
+dimensions = 25,80
+
+; generated code flavor
+flavor = Clipper Summer 87
+
+; generate multi-user code?
+multiuser = OFF
+
+; file directories
+wwdir = 
+dicdir = 
+temdir = D:\SOFT_SUB\UI2\TEM\
+tlbdir = D:\SOFT_SUB\UI2\TLB\
+gendir = 
+dbfdir = 
+ndxdir = 
+
+; default index file tag
+index = NTX
+
+
+
+; generated file tag
+gentag = C
+
+
+
+; generation display window
+window = OFF
+
+; typematic rate setting
+speed = 5

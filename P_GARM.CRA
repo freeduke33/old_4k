@@ -1,0 +1,226 @@
+//Функции управления с моделью и без в разомкнутом режиме
+
+#include <math.h>
+
+#include "tcxlwin.h"
+#include "dac_adc.h"
+#include "pro_achh.h"
+
+
+void p_garm(void)
+{
+ int  j,k;
+ unsigned long i,cl;
+ extern int pp;
+ float del_x[KAN_MAX];
+
+
+ if(!AllocBuf() || !etalon()) return;
+
+ Inf_Rab();
+
+ if(Enable()==DRV_OK)
+
+ {
+ //Плавный выход на начало
+ for(k=0;k<nki;k++)
+   del_x[k]=yt[k][0]/(float)pp;
+ for(i=0;i<=pp;i++)
+   {
+   for(k=0;k<nki;k++)
+     xk[k]=(float)i*del_x[k];
+   Imit_Driv();
+   }
+ for(cl=0;cl<cycle;cl++)
+   {
+   for(i=0;i<nr;i++)
+     {
+     for(k=0;k<nki;k++) x[k][i]=xk[k]=-yt[k][i];
+     Imit_Driv();
+     for(k=0;k<nki;k++) y[k][i]=yk[k];
+     }
+   //Плавный переход к началу внутри цикла
+   if((cl+1)<(cycle))
+     {
+     for(k=0;k<nki;k++)
+       del_x[k]=(yt[k][nr-1]-yt[k][0])/(float)pp;
+     for(i=0;i<=10;i++)
+       {
+       for(k=0;k<nki;k++)
+	 xk[k]=yt[k][nr-1]+(float)i*del_x[k];
+       Imit_Driv();
+       }
+     }
+   }
+ //Плавный выход в конце эксперимента
+  for(k=0;k<nki;k++)
+    del_x[k]=yt[k][nr-1]/(float)pp;
+  for(i=0;i<=pp;i++)
+    {
+    for(k=0;k<nki;k++)
+      xk[k]=yt[k][nr-1]-(float)i*del_x[k];
+    Imit_Driv();
+    }
+    for(k=0;k<nki;k++)
+      xk[k]=0.0;
+    Imit_Driv();
+  Disable();
+  graf_time();
+  } else printf("\007\007\007");
+
+ Wclose();
+ return;
+}
+
+
+//Функция работы с моделью в разомкнутом режиме
+void m_p_garm(void)
+{
+ static float cr[CHANNEL][PMAX];
+
+ int k,j,n_uch,m,n0,n2;
+ unsigned long i,cl;
+ float del_x[KAN_MAX],s0,s1;
+
+ n_uch=20;
+ n0=40;
+ n2=40;
+
+ if(!AllocBuf() || !etalon()) return;
+
+ Inf_Rab();
+
+ if(Enable()==DRV_OK)
+
+ {
+
+ // Подготовительные операции разомкнутого упр. с моделью
+for(k=0;k<nki;k++)
+  del_x[k]=yt[k][n_uch-1]/(float)n_uch;
+for(j=0;j<n_uch;j++)
+  {
+  for(k=0;k<nki;k++)
+    x[k][j]=yt[k][j]=(float)j*del_x[k];
+  }
+for(j=n_uch;j<=n0;j++)
+  {
+  for(k=0;k<nki;k++)
+    x[k][j]=yt[k][j];
+  }
+
+//Первый технологический прогон
+for(k=0;k<nki;k++)
+  xk[k]=x[k][0];
+Imit_Driv();
+for(k=0;k<nki;k++)
+  y[k][0]=yk[k];
+
+for(i=1;i<=n0;i++)
+  {
+  for(k=0;k<nki;k++)
+    xk[k]=x[k][i];
+  Imit_Driv();
+  for(k=0;k<nki;k++)
+    {
+    y[k][i]=yk[k];
+    if(i>n_uch)
+      {
+      switch(n1)
+	{
+	case 0:
+	  psy[k][i-1]=yt[k][i-1];
+	  psx[k][i-1-q]=x[k][i-1-q];
+	break;
+	case 1:
+	  psy[k][i-1]=(q+2)*yt[k][i-1]-(q+1)*yt[k][i-2];
+	  psx[k][i-1-q]=(q+2)*x[k][i-1-q]-(q+1)*x[k][i-2-q];
+	break;
+	}
+      }
+    }
+  }
+
+//Построение модели
+switch(p)
+  {
+  case 0:
+    for(k=0;k<nki;k++)
+      {
+      for(s0=0,s1=0,m=n0-17;m<=n0-17+qq-1;m++)
+        {
+        s0+=(yt[k][m+q]-psy[k][m-1])*(x[k][m]-psx[k][m-1-q]);
+        s1+=(x[k][m]-psx[k][m-1-q])*(x[k][m]-psx[k][m-1-q]);
+        }
+      cr[k][0]=s0/s1;
+      }
+  break;
+  case 1:
+  break;
+  case 2:
+  break;
+  }
+
+//Генерация вх.массива
+
+for(cl=0;cl<cycle;cl++)
+{
+for(i=n0;i<nr;i++)
+  {
+  for(k=0;k<nki;k++)
+    {
+    switch(n1)
+      {
+      case 0:
+	x[k][i]=x[k][i-1-q]+(yt[k][i+q-1]-y[k][i-1])/cr[k][0];
+      break;
+      case 1:
+	x[k][i]=x[k][i-1-q]*(float)(q+2)-x[k][i-2-q]*(float)(q+1)+(yt[k][i+q]-y[k][i-1]*(float)(q+2)+y[k][i-2]*(float)(q+1))/cr[k][0];
+      break;
+      }
+    if(fabs(del_x[k]=x[k][i]-x[k][i-1])>0.1*(xmax-xmin))
+      {
+      x[k][i]=x[k][i-1]+0.1*del_x[k];
+      if(x[k][i]>1.0)
+        x[k][i]=0.96;
+      else
+      if(x[k][i]<-1.0)
+        x[k][i]=-0.96;
+      }
+    }
+    for(k=0;k<nki;k++) xk[k]=x[k][i];
+    Imit_Driv();
+    for(k=0;k<nki;k++) y[k][i]=yk[k];
+  }
+//Плавный переход к началу внутри цикла
+  if((cl+1)<(cycle))
+    {
+    for(k=0;k<nki;k++)
+      del_x[k]=(x[k][nr-1]-x[k][n0])/(float)pp;
+    for(i=0;i<=pp;i++)
+      {
+      for(k=0;k<nki;k++)
+        xk[k]=(x[k][nr-1]+(float)i*del_x[k]);
+      Imit_Driv();
+      }
+    }
+}
+//Плавный выход в конце эксперимента
+ for(k=0;k<nki;k++)
+   del_x[k]=x[k][nr-1]/(float)pp;
+ for(i=0;i<=pp;i++)
+   {
+   for(k=0;k<nki;k++)
+     xk[k]=(x[k][nr-1]-(float)i*del_x[k]);
+   Imit_Driv();
+   }
+   for(k=0;k<nki;k++)
+     xk[k]=0.0;
+ Imit_Driv();
+ Disable();
+ graf_time();
+ } else printf("\007\007\007");
+
+ Wclose();
+ return;
+
+}
